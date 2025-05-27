@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RPG</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; background: #000; }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let gravity = 0.5;
+    let jumpPower = -12;
+
+    // Цвет платформы можно менять тут:
+    let platformColor = 'rgba(0, 0, 0, 0.0)';
+
+    const player = { 
+        x: 100,
+        y: 500,
+        width: 30,
+        height: 30,
+        dx: 0,
+        dy: 0,
+        onGround: false
+    };
+
+    // Загружаем изображение фона
+    const bgImage = new Image();
+    bgImage.src = 'image/foto1.png';
+
+    // Платформа — теперь бесконечная по ширине (вся ширина canvas)
+    const platform = {
+      x: 0,
+      y: 0,   // подгрузим ниже после загрузки картинки
+      width: canvas.width,
+      height: 10
+    };
+
+    function drawBackground() {
+        const centerX = (canvas.width - bgImage.width) / 2;
+        const centerY = (canvas.height - bgImage.height) / 2;
+        ctx.drawImage(bgImage, centerX, centerY);
+
+        // Позиция платформы — сразу под картинкой
+        platform.y = centerY + bgImage.height -155;  // 5px ниже картинки
+    }
+
+    function drawPlatform() {
+        ctx.fillStyle = platformColor;
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+    }
+
+    function drawPlayer() {
+        ctx.fillStyle = 'lime';
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+    }
+
+    function updatePlayer() {
+        player.dy += gravity;
+
+        let nextY = player.y + player.dy;
+        player.onGround = false;
+
+        // Проверяем столкновение с платформой
+        if (
+            player.y + player.height <= platform.y &&
+            nextY + player.height >= platform.y &&
+            player.x + player.width > platform.x &&
+            player.x < platform.x + platform.width
+        ) {
+            nextY = platform.y - player.height;
+            player.dy = 0;
+            player.onGround = true;
+        }
+
+        player.y = nextY;
+
+        player.x += player.dx;
+
+        if (player.x < 0) player.x = 0;
+        if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+    }
+
+    function gameLoop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (bgImage.complete) {
+            drawBackground();
+            drawPlatform();
+        }
+
+        drawPlayer();
+        updatePlayer();
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && player.onGround) {
+            player.dy = jumpPower;
+        }
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+            player.dx = -5;
+        }
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+            player.dx = 5;
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (
+            e.code === 'ArrowLeft' || e.code === 'KeyA' ||
+            e.code === 'ArrowRight' || e.code === 'KeyD'
+        ) {
+            player.dx = 0;
+        }
+    });
+
+    bgImage.onload = () => {
+        gameLoop();
+    };
+  </script>
+</body>
+</html>
