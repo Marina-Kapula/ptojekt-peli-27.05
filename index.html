@@ -24,31 +24,43 @@
     let cameraX = 0;
 
     const player = { 
-        x: 100,
-        y: 300,
-        width: 50,
-        height: 50,
+        x: 500,
+        y: 20,
+        width: 70,
+        height: 70,
         dx: 0,
         dy: 0,
         onGround: false,
-        direction: 1
+        direction: 1,
+        isMoving: false,
+        currentFrame: 0,
+        lastFrameTime: 0,
+        frameDelay: 200,
+        frameImages: [],
+        framesLoaded: 0,
+        frameWidths: [42, 38],
+        frameOffsets: [1, 0],
     };
 
     const bgImage = new Image();
     bgImage.src = 'image/foto1.png';
 
-    const playerImage = new Image();
-    playerImage.src = 'image/player.png';
+    player.frameImages[0] = new Image();
+    player.frameImages[0].src = 'image/frame0.png';
+    player.frameImages[0].onload = () => {
+        player.framesLoaded++;
+        if (player.framesLoaded === 2) gameLoop();
+    };
 
-    // Массив платформ с разными координатами и размерами
+    player.frameImages[1] = new Image();
+    player.frameImages[1].src = 'image/frame1.png';
+    player.frameImages[1].onload = () => {
+        player.framesLoaded++;
+        if (player.framesLoaded === 2) gameLoop();
+    };
+
     const platforms = [
-        { x: 0, y: bgImage.height - 155, width: bgImage.width, height: 10 }, // Основная платформа (дно)
-        { x: 180, y: 400, width: 50, height: 10 },
-        { x: 240, y: 350, width: 50, height: 10 },
-        { x: 300, y: 300, width: 50, height: 10 },
-        { x: 230, y: 250, width: 50, height: 10 },
-        { x: 165, y: 200, width: 50, height: 10 },
-        
+        { x: 0, y: bgImage.height - 155, width: bgImage.width, height: 10 }
     ];
 
     function drawPlayerLighting() {
@@ -75,20 +87,59 @@
 
     function drawPlatforms() {
         for (let platform of platforms) {
-            ctx.fillStyle = '#FFD700'; // Красные полупрозрачные платформы
+            ctx.fillStyle = 'rgba(0, 0, 0, 0)';
             ctx.fillRect(platform.x - cameraX, platform.y, platform.width, platform.height);
         }
     }
 
-    function drawPlayer() {
-        if (player.direction === -1) {
-            ctx.save();
-            ctx.scale(-1, 1);
-            ctx.drawImage(playerImage, -(player.x - cameraX) - player.width, player.y, player.width, player.height);
-            ctx.restore();
-        } else {
-            ctx.drawImage(playerImage, player.x - cameraX, player.y, player.width, player.height);
+    function updateAnimation(timestamp) {
+        if (!player.isMoving) {
+            player.currentFrame = 0;
+            return;
         }
+
+        if (timestamp - player.lastFrameTime >= player.frameDelay) {
+            player.currentFrame++;
+            if (player.currentFrame >= player.frameImages.length) {
+                player.currentFrame = 0;
+            }
+            player.lastFrameTime = timestamp;
+        }
+    }
+
+    function drawPlayer(timestamp) {
+        player.isMoving = Math.abs(player.dx) > 0 || !player.onGround;
+        updateAnimation(timestamp);
+
+        const frameIndex = player.currentFrame;
+        const frameWidth = player.frameWidths[frameIndex];
+        const frameOffset = player.frameOffsets[frameIndex];
+
+        const anchorX = player.x - cameraX + player.width / 2;
+        const anchorY = player.y + player.height;
+
+        ctx.save();
+
+        if (player.direction === -1) {
+            ctx.scale(-1, 1);
+            ctx.drawImage(
+                player.frameImages[frameIndex],
+                -(anchorX + frameWidth / 2 - frameOffset),
+                player.y,
+                frameWidth,
+                player.height
+            );
+        } else {
+            ctx.drawImage(
+                player.frameImages[frameIndex],
+                anchorX - frameWidth / 2 + frameOffset,
+                player.y,
+                frameWidth,
+                player.height
+            );
+        }
+
+        ctx.restore();
     }
 
     function updatePlayer() {
@@ -96,7 +147,6 @@
         let nextY = player.y + player.dy;
         player.onGround = false;
 
-        // Проверка коллизий со всеми платформами
         for (let platform of platforms) {
             if (
                 player.y + player.height <= platform.y &&
@@ -107,27 +157,22 @@
                 nextY = platform.y - player.height;
                 player.dy = 0;
                 player.onGround = true;
-                break; // Выходим из цикла после первой найденной коллизии
+                break;
             }
         }
 
         player.y = nextY;
         player.x += player.dx;
 
-        // Ограничения по фону, а не по окну
         if (player.x < 0) player.x = 0;
         if (player.x + player.width > bgImage.width) {
             player.x = bgImage.width - player.width;
         }
 
-        // Центрируем камеру
         cameraX = player.x - canvas.width / 2 + player.width / 2;
-
-        // Ограничения камеры
         cameraX = Math.max(0, Math.min(cameraX, bgImage.width - canvas.width));
     }
 
-    // Светлячки
     const fireflies = [];
 
     function createFireflies(count) {
@@ -167,18 +212,17 @@
         }
     }
 
-    function gameLoop() {
+    function gameLoop(timestamp) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        if (bgImage.complete) {
+        if (bgImage.complete && player.framesLoaded === 2) {
             drawBackground();
-            drawPlatforms(); // Рисуем все платформы
+            drawPlatforms();
+            drawFireflies();
+            drawPlayerLighting();
+            drawPlayer(timestamp);
+            updatePlayer();
         }
-
-        drawFireflies();
-        drawPlayerLighting();
-        drawPlayer();
-        updatePlayer();
 
         requestAnimationFrame(gameLoop);
     }
@@ -207,18 +251,12 @@
     });
 
     bgImage.onload = () => {
-        // Обновляем основную платформу (дно) после загрузки фона
         platforms[0].y = bgImage.height - 155;
         platforms[0].width = bgImage.width;
-        
-        createFireflies(60);
-        gameLoop();
-    };
 
-    playerImage.onload = () => {
-        gameLoop();
+        createFireflies(100);
     };
-
   </script>
 </body>
 </html>
+
