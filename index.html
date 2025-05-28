@@ -19,77 +19,152 @@
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    let gravity = 0.5;
-    let jumpPower = -12;
-
-    // Цвет платформы можно менять тут:
-    let platformColor = 'rgba(0, 0, 0, 0.0)';
+    let gravity = 0.2;
+    let jumpPower = -5;
+    let cameraX = 0;
 
     const player = { 
         x: 100,
-        y: 500,
-        width: 30,
-        height: 30,
+        y: 300,
+        width: 50,
+        height: 50,
         dx: 0,
         dy: 0,
-        onGround: false
+        onGround: false,
+        direction: 1
     };
 
-    // Загружаем изображение фона
     const bgImage = new Image();
     bgImage.src = 'image/foto1.png';
 
-    // Платформа — теперь бесконечная по ширине (вся ширина canvas)
-    const platform = {
-      x: 0,
-      y: 0,   // подгрузим ниже после загрузки картинки
-      width: canvas.width,
-      height: 10
-    };
+    const playerImage = new Image();
+    playerImage.src = 'image/player.png';
 
-    function drawBackground() {
-        const centerX = (canvas.width - bgImage.width) / 2;
-        const centerY = (canvas.height - bgImage.height) / 2;
-        ctx.drawImage(bgImage, centerX, centerY);
+    // Массив платформ с разными координатами и размерами
+    const platforms = [
+        { x: 0, y: bgImage.height - 155, width: bgImage.width, height: 10 }, // Основная платформа (дно)
+        { x: 180, y: 400, width: 50, height: 10 },
+        { x: 240, y: 350, width: 50, height: 10 },
+        { x: 300, y: 300, width: 50, height: 10 },
+        { x: 230, y: 250, width: 50, height: 10 },
+        { x: 165, y: 200, width: 50, height: 10 },
+        
+    ];
 
-        // Позиция платформы — сразу под картинкой
-        platform.y = centerY + bgImage.height -155;  // 5px ниже картинки
+    function drawPlayerLighting() {
+        const gradient = ctx.createRadialGradient(
+            player.x - cameraX + player.width / 2,
+            player.y + player.height / 2,
+            1,
+            player.x - cameraX + player.width / 2,
+            player.y + player.height / 2,
+            40
+        );
+
+        gradient.addColorStop(0, 'rgba(255, 223, 0, 0.3)');
+        gradient.addColorStop(0.5, 'rgba(255, 140, 0, 0.2)');
+        gradient.addColorStop(1, 'rgba(255, 50, 0, 0)');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(player.x - cameraX - 50, player.y - 50, player.width + 100, player.height + 100);
     }
 
-    function drawPlatform() {
-        ctx.fillStyle = platformColor;
-        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+    function drawBackground() {
+        ctx.drawImage(bgImage, -cameraX, 0);
+    }
+
+    function drawPlatforms() {
+        for (let platform of platforms) {
+            ctx.fillStyle = '#FFD700'; // Красные полупрозрачные платформы
+            ctx.fillRect(platform.x - cameraX, platform.y, platform.width, platform.height);
+        }
     }
 
     function drawPlayer() {
-        ctx.fillStyle = 'lime';
-        ctx.fillRect(player.x, player.y, player.width, player.height);
+        if (player.direction === -1) {
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.drawImage(playerImage, -(player.x - cameraX) - player.width, player.y, player.width, player.height);
+            ctx.restore();
+        } else {
+            ctx.drawImage(playerImage, player.x - cameraX, player.y, player.width, player.height);
+        }
     }
 
     function updatePlayer() {
         player.dy += gravity;
-
         let nextY = player.y + player.dy;
         player.onGround = false;
 
-        // Проверяем столкновение с платформой
-        if (
-            player.y + player.height <= platform.y &&
-            nextY + player.height >= platform.y &&
-            player.x + player.width > platform.x &&
-            player.x < platform.x + platform.width
-        ) {
-            nextY = platform.y - player.height;
-            player.dy = 0;
-            player.onGround = true;
+        // Проверка коллизий со всеми платформами
+        for (let platform of platforms) {
+            if (
+                player.y + player.height <= platform.y &&
+                nextY + player.height >= platform.y &&
+                player.x + player.width > platform.x &&
+                player.x < platform.x + platform.width
+            ) {
+                nextY = platform.y - player.height;
+                player.dy = 0;
+                player.onGround = true;
+                break; // Выходим из цикла после первой найденной коллизии
+            }
         }
 
         player.y = nextY;
-
         player.x += player.dx;
 
+        // Ограничения по фону, а не по окну
         if (player.x < 0) player.x = 0;
-        if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+        if (player.x + player.width > bgImage.width) {
+            player.x = bgImage.width - player.width;
+        }
+
+        // Центрируем камеру
+        cameraX = player.x - canvas.width / 2 + player.width / 2;
+
+        // Ограничения камеры
+        cameraX = Math.max(0, Math.min(cameraX, bgImage.width - canvas.width));
+    }
+
+    // Светлячки
+    const fireflies = [];
+
+    function createFireflies(count) {
+        for (let i = 0; i < count; i++) {
+            fireflies.push({
+                x: Math.random() * bgImage.width,
+                y: Math.random() * canvas.height * 0.8,
+                radius: Math.random() * 1.5 + 0.5,
+                baseAlpha: Math.random() * 0.3 + 0.2,
+                pulseSpeed: Math.random() * 0.05 + 0.01,
+                angle: Math.random() * Math.PI * 2
+            });
+        }
+    }
+
+    function drawFireflies() {
+        for (let firefly of fireflies) {
+            firefly.angle += firefly.pulseSpeed;
+            const alpha = firefly.baseAlpha + Math.sin(firefly.angle) * 0.2;
+
+            const gradient = ctx.createRadialGradient(
+                firefly.x - cameraX,
+                firefly.y,
+                0,
+                firefly.x - cameraX,
+                firefly.y,
+                firefly.radius * 5
+            );
+
+            gradient.addColorStop(0, `rgba(255, 180, 50, ${alpha})`);
+            gradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(firefly.x - cameraX, firefly.y, firefly.radius * 10, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     function gameLoop() {
@@ -97,9 +172,11 @@
 
         if (bgImage.complete) {
             drawBackground();
-            drawPlatform();
+            drawPlatforms(); // Рисуем все платформы
         }
 
+        drawFireflies();
+        drawPlayerLighting();
         drawPlayer();
         updatePlayer();
 
@@ -111,10 +188,12 @@
             player.dy = jumpPower;
         }
         if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
-            player.dx = -5;
+            player.dx = -2;
+            player.direction = -1;
         }
         if (e.code === 'ArrowRight' || e.code === 'KeyD') {
-            player.dx = 5;
+            player.dx = 2;
+            player.direction = 1;
         }
     });
 
@@ -128,8 +207,18 @@
     });
 
     bgImage.onload = () => {
+        // Обновляем основную платформу (дно) после загрузки фона
+        platforms[0].y = bgImage.height - 155;
+        platforms[0].width = bgImage.width;
+        
+        createFireflies(60);
         gameLoop();
     };
+
+    playerImage.onload = () => {
+        gameLoop();
+    };
+
   </script>
 </body>
 </html>
