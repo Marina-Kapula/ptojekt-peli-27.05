@@ -23,9 +23,9 @@
     let jumpPower = -5;
     let cameraX = 0;
 
-    const player = { 
-        x: 500,
-        y: 20,
+    const player = {
+        x: 6400,
+        y: 375,
         width: 70,
         height: 70,
         dx: 0,
@@ -64,21 +64,23 @@
     ];
 
     function drawPlayerLighting() {
-        const gradient = ctx.createRadialGradient(
-            player.x - cameraX + player.width / 2,
-            player.y + player.height / 2,
-            1,
-            player.x - cameraX + player.width / 2,
-            player.y + player.height / 2,
-            40
-        );
+        if (player.x >= 6000 && player.x <= 6500) {
+            const gradient = ctx.createRadialGradient(
+                player.x - cameraX + player.width / 2,
+                player.y + player.height / 2,
+                1,
+                player.x - cameraX + player.width / 2,
+                player.y + player.height / 2,
+                40
+            );
 
-        gradient.addColorStop(0, 'rgba(255, 223, 0, 0.3)');
-        gradient.addColorStop(0.5, 'rgba(255, 140, 0, 0.2)');
-        gradient.addColorStop(1, 'rgba(255, 50, 0, 0)');
+            gradient.addColorStop(0, 'rgba(255, 223, 0, 0.3)');
+            gradient.addColorStop(0.5, 'rgba(255, 140, 0, 0.2)');
+            gradient.addColorStop(1, 'rgba(255, 50, 0, 0)');
 
-        ctx.fillStyle = gradient;
-        ctx.fillRect(player.x - cameraX - 50, player.y - 50, player.width + 100, player.height + 100);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(player.x - cameraX - 50, player.y - 50, player.width + 100, player.height + 100);
+        }
     }
 
     function drawBackground() {
@@ -116,7 +118,6 @@
         const frameOffset = player.frameOffsets[frameIndex];
 
         const anchorX = player.x - cameraX + player.width / 2;
-        const anchorY = player.y + player.height;
 
         ctx.save();
 
@@ -212,20 +213,58 @@
         }
     }
 
-    function gameLoop(timestamp) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+function gameLoop(timestamp) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        if (bgImage.complete && player.framesLoaded === 2) {
-            drawBackground();
-            drawPlatforms();
-            drawFireflies();
-            drawPlayerLighting();
-            drawPlayer(timestamp);
-            updatePlayer();
+    if (bgImage.complete && player.framesLoaded === 2) {
+        drawBackground();
+        drawPlatforms();
+        drawFireflies();
+        drawPlayerLighting();
+        drawPlayer(timestamp);
+        updatePlayer();
+
+        ctx.fillStyle = 'white';
+        ctx.font = '20px sans-serif';  // фиксированный размер
+        ctx.textAlign = 'center';
+
+        // Текст ровно над игроком, когда x >= 6300
+        if (player.x >= 6300) {
+            let screenX = player.x - cameraX + player.width / 2;
+            let screenY = player.y - 10; // чуть выше головы
+            ctx.fillText('Tuntuu, että pitäis lähteä kotiin', screenX, screenY);
         }
 
-        requestAnimationFrame(gameLoop);
+        // Спам текста 
+        if (player.x >= 5700 && player.x <= 5850) {
+            let screenX = player.x - cameraX + player.width / 2;
+            let screenY = player.y - 10; // чуть выше предыдущего текста
+            ctx.fillText('Tärkeintä on, ettei putoa alas..', screenX, screenY);
+        }
+
+        // Спам текста 
+        if (player.x >= 5200 && player.x <= 5390) {
+            let screenX = player.x - cameraX + player.width / 2;
+            let screenY = player.y - 10; // чуть выше предыдущего текста
+            ctx.fillText('Odottaako äiti mua yhä?..', screenX, screenY);
+        }
+
+
+        // Спам текста 
+        if (player.x >= 3800 && player.x <= 4000) {
+            let screenX = player.x - cameraX + player.width / 2;
+            let screenY = player.y - 10; // чуть выше предыдущего текста
+            ctx.fillText('Pidätkö sinäkin näistä tulikärpäsistä? Otetaan pari kotiin mukaan', screenX, screenY);
+        }
+
+
+
     }
+
+    requestAnimationFrame(gameLoop);
+}
+
+
 
     window.addEventListener('keydown', (e) => {
         if (e.code === 'Space' && player.onGround) {
@@ -259,4 +298,5 @@
   </script>
 </body>
 </html>
+
 
