@@ -16,40 +16,51 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
+    // Розміри екрану
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
+    // Гравітація і сила стрибка
     let gravity = 0.2;
     let jumpPower = -5;
-    let cameraX = 0;
+    let cameraX = 0; // Зсув камери
 
-    const player = {
-        x: 6400,
-        y: 375,
-        width: 70,
-        height: 70,
-        dx: 0,
-        dy: 0,
-        onGround: false,
-        direction: 1,
-        isMoving: false,
-        currentFrame: 0,
-        lastFrameTime: 0,
-        frameDelay: 200,
-        frameImages: [],
-        framesLoaded: 0,
-        frameWidths: [42, 38],
-        frameOffsets: [1, 0],
-    };
+const player = {
+    x: 6400,
+    y: 372,
+    width: 50,            // вiзуальн
+    height: 70,
+    collisionWidth: 1,   // фiзич розмір
+    dx: 0,
+    dy: 0,
+    onGround: false,
+    direction: 1,
+    isMoving: false,
+    currentFrame: 0,
+    lastFrameTime: 0,
+    frameDelay: 200,
+    frameImages: [],
+    framesLoaded: 0,
+    frameWidths: [42, 38],
+    frameOffsets: [1, 0],
+};
 
+
+    // Стан смерті
+    let isDead = false;
+    let deathOpacity = 0;
+    const deathYThreshold = 372 + player.height + 50; // Поріг смерті (нижче платформ)
+
+    // Фонова картинка
     const bgImage = new Image();
     bgImage.src = 'image/foto1.png';
 
+    // Кадри гравця
     player.frameImages[0] = new Image();
     player.frameImages[0].src = 'image/frame0.png';
     player.frameImages[0].onload = () => {
         player.framesLoaded++;
-        if (player.framesLoaded === 2) gameLoop();
+        if (player.framesLoaded === 2) gameLoop(); // коли обидва кадри завантажені — старт
     };
 
     player.frameImages[1] = new Image();
@@ -59,10 +70,29 @@
         if (player.framesLoaded === 2) gameLoop();
     };
 
-    const platforms = [
-        { x: 0, y: bgImage.height - 155, width: bgImage.width, height: 10 }
-    ];
+const platforms = [
+  { x: 6068, y: bgImage.height - 155, width: 120, height: 10 }, 
+  { x: 5948, y: bgImage.height - 155, width: 46, height: 10 },  
+  { x: 5595, y: bgImage.height - 155, width: 270, height: 10 },
+  { x: 5355, y: bgImage.height - 155, width: 170, height: 10 }, 
+  { x: 5025, y: bgImage.height - 155, width: 260, height: 10 }, 
+  { x: 4909, y: bgImage.height - 155, width: 55, height: 10 },  
+  { x: 4670, y: bgImage.height - 155, width: 180, height: 10 }, 
+  { x: 4400, y: bgImage.height - 155, width: 210, height: 10 }, 
+  { x: 4158, y: bgImage.height - 155, width: 180, height: 10 }, 
+  { x: 4045, y: bgImage.height - 155, width: 60, height: 10 },  
+  { x: 3780, y: bgImage.height - 155, width: 198, height: 10 },
+  { x: 3487, y: bgImage.height - 155, width: 178, height: 10 }, 
 
+  
+  { x: 3225, y: bgImage.height - 155, width: 209, height: 10 }, 
+  { x: 2893, y: bgImage.height - 155, width: 250, height: 10 }, 
+  { x: 2060, y: bgImage.height - 155, width: 740, height: 10 }, 
+  { x: -5,   y: bgImage.height - 155, width: 1990, height: 10 }, 
+];
+
+
+    // Світло навколо гравця 
     function drawPlayerLighting() {
         if (player.x >= 6000 && player.x <= 6500) {
             const gradient = ctx.createRadialGradient(
@@ -83,17 +113,20 @@
         }
     }
 
+    // Малює фон
     function drawBackground() {
         ctx.drawImage(bgImage, -cameraX, 0);
     }
 
+    // Невидимі платформи
     function drawPlatforms() {
         for (let platform of platforms) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0)'; // Прозорий колір платформ, якщо хочеш побачити зроби червоними
             ctx.fillRect(platform.x - cameraX, platform.y, platform.width, platform.height);
         }
     }
 
+    // Анімація гравця.. 
     function updateAnimation(timestamp) {
         if (!player.isMoving) {
             player.currentFrame = 0;
@@ -109,6 +142,7 @@
         }
     }
 
+    // Малює гравця з урахуванням напрямку
     function drawPlayer(timestamp) {
         player.isMoving = Math.abs(player.dx) > 0 || !player.onGround;
         updateAnimation(timestamp);
@@ -143,11 +177,15 @@
         ctx.restore();
     }
 
+    // Оновлення позиції гравця
     function updatePlayer() {
+        if (isDead) return; // Якщо гравець мертвий - не оновлюємо позицію
+        
         player.dy += gravity;
         let nextY = player.y + player.dy;
         player.onGround = false;
 
+        // Перевірка на зіткнення з платформами
         for (let platform of platforms) {
             if (
                 player.y + player.height <= platform.y &&
@@ -165,17 +203,27 @@
         player.y = nextY;
         player.x += player.dx;
 
+        // Обмеження по краях
         if (player.x < 0) player.x = 0;
         if (player.x + player.width > bgImage.width) {
             player.x = bgImage.width - player.width;
         }
 
+        // Перевірка на смерть (падіння нижче платформ)
+        if (player.y > deathYThreshold && !isDead) {
+            isDead = true;
+            deathOpacity = 0;
+        }
+
+        // Камера слідкує за гравцем
         cameraX = player.x - canvas.width / 2 + player.width / 2;
         cameraX = Math.max(0, Math.min(cameraX, bgImage.width - canvas.width));
     }
 
+    // Массив світлячків
     const fireflies = [];
 
+    // Створення світлячків
     function createFireflies(count) {
         for (let i = 0; i < count; i++) {
             fireflies.push({
@@ -189,6 +237,7 @@
         }
     }
 
+    // Малює світлячків
     function drawFireflies() {
         for (let firefly of fireflies) {
             firefly.angle += firefly.pulseSpeed;
@@ -213,60 +262,93 @@
         }
     }
 
-function gameLoop(timestamp) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (bgImage.complete && player.framesLoaded === 2) {
-        drawBackground();
-        drawPlatforms();
-        drawFireflies();
-        drawPlayerLighting();
-        drawPlayer(timestamp);
-        updatePlayer();
-
-        ctx.fillStyle = 'white';
-        ctx.font = '20px sans-serif';  // фиксированный размер
-        ctx.textAlign = 'center';
-
-        // Текст ровно над игроком, когда x >= 6300
-        if (player.x >= 6300) {
-            let screenX = player.x - cameraX + player.width / 2;
-            let screenY = player.y - 10; // чуть выше головы
-            ctx.fillText('Tuntuu, että pitäis lähteä kotiin', screenX, screenY);
+    // Малює ефект смерті
+    function drawDeathEffect() {
+        if (!isDead) return;
+        
+        // Плавне затемнення
+        deathOpacity = Math.min(deathOpacity + 0.01, 1);
+        
+        ctx.fillStyle = `rgba(0, 0, 0, ${deathOpacity})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Відображення тексту після певного рівня затемнення
+        if (deathOpacity > 0.5) {
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 60px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Kuolit...', canvas.width / 2, canvas.height / 2); // Текст смерті 
+            
+            // Додатковий текст
+            ctx.font = '30px Arial';
+            ctx.fillText('Press F5 to restart', canvas.width / 2, canvas.height / 2 + 50);
         }
-
-        // Спам текста 
-        if (player.x >= 5700 && player.x <= 5850) {
-            let screenX = player.x - cameraX + player.width / 2;
-            let screenY = player.y - 10; // чуть выше предыдущего текста
-            ctx.fillText('Tärkeintä on, ettei putoa alas..', screenX, screenY);
-        }
-
-        // Спам текста 
-        if (player.x >= 5200 && player.x <= 5390) {
-            let screenX = player.x - cameraX + player.width / 2;
-            let screenY = player.y - 10; // чуть выше предыдущего текста
-            ctx.fillText('Odottaako äiti mua yhä?..', screenX, screenY);
-        }
-
-
-        // Спам текста 
-        if (player.x >= 3800 && player.x <= 4000) {
-            let screenX = player.x - cameraX + player.width / 2;
-            let screenY = player.y - 10; // чуть выше предыдущего текста
-            ctx.fillText('Pidätkö sinäkin näistä tulikärpäsistä? Otetaan pari kotiin mukaan', screenX, screenY);
-        }
-
-
-
     }
 
-    requestAnimationFrame(gameLoop);
-}
+    // Головний цикл гри
+    function gameLoop(timestamp) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (bgImage.complete && player.framesLoaded === 2) {
+            drawBackground();
+            drawPlatforms();
+            drawFireflies();
+            drawPlayerLighting();
+            drawPlayer(timestamp);
+            updatePlayer();
+            drawDeathEffect();
+
+            ctx.fillStyle = 'white';
+            ctx.font = '20px sans-serif';
+            ctx.textAlign = 'center';
+
+            // Показує текст в різних місцях карти
+            if (player.x >= 6300 && !isDead) {
+                let screenX = player.x - cameraX + player.width / 2;
+                let screenY = player.y - 10;
+                ctx.fillText('Tuntuu, että pitäis lähteä kotiin', screenX, screenY);
+            }
+
+            if (player.x >= 5700 && player.x <= 5850 && !isDead) {
+                let screenX = player.x - cameraX + player.width / 2;
+                let screenY = player.y - 10;
+                ctx.fillText('En halua pudota...', screenX, screenY);
+            }
+
+            if (player.x >= 5200 && player.x <= 5390 && !isDead) {
+                let screenX = player.x - cameraX + player.width / 2;
+                let screenY = player.y - 10;
+                ctx.fillText('Odottaako äiti mua yhä?', screenX, screenY);
+            }
+
+            if (player.x >= 3800 && player.x <= 4000 && !isDead) {
+                let screenX = player.x - cameraX + player.width / 2;
+                let screenY = player.y - 10;
+                ctx.fillText('Unohdin, ettei minulla ole äitiä...', screenX, screenY);
+            }
+
+            if (player.x >= 1250 && player.x <= 1400 && !isDead) {
+                let screenX = player.x - cameraX + player.width / 2;
+                let screenY = player.y - 10;
+                ctx.fillText('Näen kotini!! Olen kotona!!', screenX, screenY);
+            }
+
+            if (player.x >= 500 && player.x <= 800 && !isDead) {
+                let screenX = player.x - cameraX + player.width / 2;
+                let screenY = player.y - 10;
+                ctx.fillText('Kiitos', screenX, screenY);
+            }
 
 
+        }
 
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Рух гравця по клавішам
     window.addEventListener('keydown', (e) => {
+        if (isDead) return; // Якщо гравець мертвий - ігноруємо введення
+        
         if (e.code === 'Space' && player.onGround) {
             player.dy = jumpPower;
         }
@@ -281,6 +363,8 @@ function gameLoop(timestamp) {
     });
 
     window.addEventListener('keyup', (e) => {
+        if (isDead) return; // Якщо гравець мертвий - ігноруємо введення
+        
         if (
             e.code === 'ArrowLeft' || e.code === 'KeyA' ||
             e.code === 'ArrowRight' || e.code === 'KeyD'
@@ -289,14 +373,16 @@ function gameLoop(timestamp) {
         }
     });
 
+    // Коли фон завантажено — оновлюємо платформу і створюємо світлячків
     bgImage.onload = () => {
         platforms[0].y = bgImage.height - 155;
         platforms[0].width = bgImage.width;
 
-        createFireflies(100);
+        createFireflies(200); // тут вибираэш кількість свытлячків 200 або 300 скільки хочеш
     };
+
+
+
   </script>
 </body>
 </html>
-
-
